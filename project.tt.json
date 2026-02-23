@@ -1,0 +1,13 @@
+{
+  "miniprogramRoot": "./",
+  "projectname": "qr-generate",
+  "description": "二维码生成器",
+  "appid": "touristappid",
+  "setting": {
+    "urlCheck": true,
+    "es6": false,
+    "postcss": false,
+    "minified": false
+  },
+  "compileType": "miniprogram"
+}

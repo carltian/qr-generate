@@ -1,0 +1,5 @@
+export default definePageConfig({
+  navigationBarTitleText: '生成二维码',
+  navigationBarBackgroundColor: '#667eea',
+  navigationBarTextStyle: 'white'
+})
