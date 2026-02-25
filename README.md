@@ -180,3 +180,7 @@ MIT
 ## 小程序地址
 
 ![微信小程序](assets/weapp-qrcode.png)
+
+## 我的公众号
+
+![公众号地址](assets/wechat-qrcode.jpg)
