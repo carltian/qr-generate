@@ -34,7 +34,7 @@ export const defaultQRCodeOptions: QRCodeOptions = {
     dark: "#000000",
     light: "#ffffff",
   },
-  errorCorrectionLevel: "M",
+  errorCorrectionLevel: "H",
 };
 
 /**
@@ -45,22 +45,23 @@ export const defaultQRCodeOptions: QRCodeOptions = {
  */
 export const generateQRCodeModules = (
   text: string,
-  errorCorrectionLevel: "L" | "M" | "Q" | "H" = "M"
+  errorCorrectionLevel: "L" | "M" | "Q" | "H" = "H"
 ) => {
   const qrData = QRCode.create(text, { errorCorrectionLevel });
   return qrData.modules;
 };
 
 /**
- * 生成二维码临时图片路径（小程序环境）
+ * 使用canvas上下文绘制二维码
+ * @param ctx canvas上下文
  * @param text 要编码的文本内容
  * @param options 二维码配置选项
- * @returns 返回Promise<string> 临时图片路径
  */
-export const generateQRCodeTempFile = async (
+export const drawQRCodeToCanvas = (
+  ctx: any,
   text: string,
   options: Partial<QRCodeOptions> = {}
-): Promise<string> => {
+): void => {
   const mergedOptions = { ...defaultQRCodeOptions, ...options };
   const modules = generateQRCodeModules(
     text,
@@ -72,53 +73,37 @@ export const generateQRCodeTempFile = async (
   const cellSize = width / (moduleCount + mergedOptions.margin * 2);
   const marginOffset = mergedOptions.margin * cellSize;
 
-  return new Promise((resolve, reject) => {
-    const offscreenCanvas = Taro.createOffscreenCanvas({
-      type: "2d",
-      width,
-      height: width,
-    });
+  ctx.setFillStyle(mergedOptions.color.light);
+  ctx.fillRect(0, 0, width, width);
 
-    const ctx = offscreenCanvas.getContext("2d");
-
-    ctx.fillStyle = mergedOptions.color.light;
-    ctx.fillRect(0, 0, width, width);
-
-    ctx.fillStyle = mergedOptions.color.dark;
-    for (let row = 0; row < moduleCount; row++) {
-      for (let col = 0; col < moduleCount; col++) {
-        if (modules.data[row * moduleCount + col]) {
-          ctx.fillRect(
-            marginOffset + col * cellSize,
-            marginOffset + row * cellSize,
-            cellSize,
-            cellSize
-          );
-        }
+  ctx.setFillStyle(mergedOptions.color.dark);
+  for (let row = 0; row < moduleCount; row++) {
+    for (let col = 0; col < moduleCount; col++) {
+      if (modules.data[row * moduleCount + col]) {
+        ctx.fillRect(
+          marginOffset + col * cellSize,
+          marginOffset + row * cellSize,
+          cellSize,
+          cellSize
+        );
       }
     }
-
-    Taro.canvasToTempFilePath({
-      canvas: offscreenCanvas,
-      success: (res) => {
-        resolve(res.tempFilePath);
-      },
-      fail: (err) => {
-        reject(err);
-      },
-    });
-  });
+  }
 };
 
 /**
- * 生成完整的二维码图片（包含标签和Logo）
+ * 绘制完整的二维码图片到canvas（包含标签和Logo）
+ * @param canvasId canvas元素ID
  * @param text 要编码的文本内容
  * @param options 完整二维码配置选项
+ * @param componentInstance 组件实例（用于获取canvas上下文）
  * @returns 返回Promise<string> 临时图片路径
  */
 export const generateFullQRCodeImage = async (
+  canvasId: string,
   text: string,
-  options: FullQRCodeOptions = {}
+  options: FullQRCodeOptions = {},
+  componentInstance?: any
 ): Promise<string> => {
   const mergedOptions = { ...defaultQRCodeOptions, ...options };
   const modules = generateQRCodeModules(
@@ -138,30 +123,21 @@ export const generateFullQRCodeImage = async (
   const totalHeight = qrWidth + topLabelSpace + bottomLabelSpace + padding * 2;
   const totalWidth = qrWidth + padding * 2;
 
-  const pixelRatio = 2;
-
-  const offscreenCanvas = Taro.createOffscreenCanvas({
-    type: "2d",
-    width: totalWidth * pixelRatio,
-    height: totalHeight * pixelRatio,
-  });
-
-  const ctx = offscreenCanvas.getContext("2d");
-  ctx.scale(pixelRatio, pixelRatio);
+  const ctx = Taro.createCanvasContext(canvasId, componentInstance);
 
   const gradient = ctx.createLinearGradient(0, 0, totalWidth, totalHeight);
   gradient.addColorStop(0, "rgb(245, 247, 250)");
   gradient.addColorStop(1, "rgb(195, 207, 226)");
-  ctx.fillStyle = gradient;
+  ctx.setFillStyle(gradient);
   ctx.fillRect(0, 0, totalWidth, totalHeight);
 
   let currentY = padding;
 
   if (options.topLabel) {
-    ctx.fillStyle = "#333333";
-    ctx.font = "bold 16px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
+    ctx.setFillStyle("#333333");
+    ctx.setFontSize(16);
+    ctx.setTextAlign("center");
+    ctx.setTextBaseline("middle");
     ctx.fillText(options.topLabel, totalWidth / 2, currentY + labelHeight / 2);
     currentY += labelHeight + 10;
   }
@@ -169,10 +145,10 @@ export const generateFullQRCodeImage = async (
   const qrStartX = padding;
   const qrStartY = currentY;
 
-  ctx.fillStyle = mergedOptions.color.light;
+  ctx.setFillStyle(mergedOptions.color.light);
   ctx.fillRect(qrStartX, qrStartY, qrWidth, qrWidth);
 
-  ctx.fillStyle = mergedOptions.color.dark;
+  ctx.setFillStyle(mergedOptions.color.dark);
   for (let row = 0; row < moduleCount; row++) {
     for (let col = 0; col < moduleCount; col++) {
       if (modules.data[row * moduleCount + col]) {
@@ -186,36 +162,13 @@ export const generateFullQRCodeImage = async (
     }
   }
 
-  const finishDrawing = (): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      if (options.bottomLabel) {
-        const bottomY = qrStartY + qrWidth + 10 + labelHeight / 2;
-        ctx.fillStyle = "#333333";
-        ctx.font = "bold 16px sans-serif";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(options.bottomLabel, totalWidth / 2, bottomY);
-      }
-
-      Taro.canvasToTempFilePath({
-        canvas: offscreenCanvas,
-        success: (res) => {
-          resolve(res.tempFilePath);
-        },
-        fail: (err) => {
-          reject(err);
-        },
-      });
-    });
-  };
-
   if (options.logoUrl && options.logoSize) {
     try {
       const logoX = qrStartX + (qrWidth - options.logoSize) / 2;
       const logoY = qrStartY + (qrWidth - options.logoSize) / 2;
       const logoPadding = 4;
 
-      ctx.fillStyle = "#ffffff";
+      ctx.setFillStyle("#ffffff");
       ctx.fillRect(
         logoX - logoPadding,
         logoY - logoPadding,
@@ -223,30 +176,123 @@ export const generateFullQRCodeImage = async (
         options.logoSize + logoPadding * 2
       );
 
-      const logoImage = offscreenCanvas.createImage();
-
-      await new Promise<void>((resolveLogo) => {
-        logoImage.onload = () => {
-          ctx.drawImage(
-            logoImage,
-            logoX,
-            logoY,
-            options.logoSize!,
-            options.logoSize!
-          );
-          resolveLogo();
-        };
-        logoImage.onerror = () => {
-          resolveLogo();
-        };
-        logoImage.src = options.logoUrl!;
-      });
+      ctx.drawImage(
+        options.logoUrl,
+        logoX,
+        logoY,
+        options.logoSize,
+        options.logoSize
+      );
     } catch (error) {
       console.error("绘制Logo失败:", error);
     }
   }
 
-  return finishDrawing();
+  if (options.bottomLabel) {
+    const bottomY = qrStartY + qrWidth + 10 + labelHeight / 2;
+    ctx.setFillStyle("#333333");
+    ctx.setFontSize(16);
+    ctx.setTextAlign("center");
+    ctx.setTextBaseline("middle");
+    ctx.fillText(options.bottomLabel, totalWidth / 2, bottomY);
+  }
+
+  return new Promise((resolve, reject) => {
+    ctx.draw(false, () => {
+      setTimeout(() => {
+        Taro.canvasToTempFilePath(
+          {
+            canvasId: canvasId,
+            x: 0,
+            y: 0,
+            width: totalWidth,
+            height: totalHeight,
+            destWidth: totalWidth * 2,
+            destHeight: totalHeight * 2,
+            success: (res) => {
+              resolve(res.tempFilePath);
+            },
+            fail: (err) => {
+              console.error("canvasToTempFilePath失败:", err);
+              reject(err);
+            },
+          },
+          componentInstance
+        );
+      }, 100);
+    });
+  });
+};
+
+/**
+ * 生成纯二维码临时图片路径（小程序环境）
+ * @param canvasId canvas元素ID
+ * @param text 要编码的文本内容
+ * @param options 二维码配置选项
+ * @param componentInstance 组件实例
+ * @returns 返回Promise<string> 临时图片路径
+ */
+export const generateQRCodeTempFile = async (
+  canvasId: string,
+  text: string,
+  options: Partial<QRCodeOptions> = {},
+  componentInstance?: any
+): Promise<string> => {
+  const mergedOptions = { ...defaultQRCodeOptions, ...options };
+  const modules = generateQRCodeModules(
+    text,
+    mergedOptions.errorCorrectionLevel
+  );
+
+  const moduleCount = modules.size;
+  const width = mergedOptions.width;
+  const cellSize = width / (moduleCount + mergedOptions.margin * 2);
+  const marginOffset = mergedOptions.margin * cellSize;
+
+  const ctx = Taro.createCanvasContext(canvasId, componentInstance);
+
+  ctx.setFillStyle(mergedOptions.color.light);
+  ctx.fillRect(0, 0, width, width);
+
+  ctx.setFillStyle(mergedOptions.color.dark);
+  for (let row = 0; row < moduleCount; row++) {
+    for (let col = 0; col < moduleCount; col++) {
+      if (modules.data[row * moduleCount + col]) {
+        ctx.fillRect(
+          marginOffset + col * cellSize,
+          marginOffset + row * cellSize,
+          cellSize,
+          cellSize
+        );
+      }
+    }
+  }
+
+  return new Promise((resolve, reject) => {
+    ctx.draw(false, () => {
+      setTimeout(() => {
+        Taro.canvasToTempFilePath(
+          {
+            canvasId: canvasId,
+            x: 0,
+            y: 0,
+            width: width,
+            height: width,
+            destWidth: width * 2,
+            destHeight: width * 2,
+            success: (res) => {
+              resolve(res.tempFilePath);
+            },
+            fail: (err) => {
+              console.error("canvasToTempFilePath失败:", err);
+              reject(err);
+            },
+          },
+          componentInstance
+        );
+      }, 100);
+    });
+  });
 };
 
 /**
@@ -283,4 +329,26 @@ export const calculateMaxLogoSize = (
     H: 0.3,
   };
   return qrSize * maxRatioMap[errorCorrectionLevel];
+};
+
+/**
+ * 计算完整二维码图片的总尺寸
+ * @param qrWidth 二维码宽度
+ * @param topLabel 顶部标签
+ * @param bottomLabel 底部标签
+ * @returns 包含totalWidth和totalHeight的对象
+ */
+export const calculateFullQRCodeSize = (
+  qrWidth: number,
+  topLabel?: string,
+  bottomLabel?: string
+): { totalWidth: number; totalHeight: number } => {
+  const padding = 20;
+  const labelHeight = 36;
+  const topLabelSpace = topLabel ? labelHeight + 10 : 0;
+  const bottomLabelSpace = bottomLabel ? labelHeight + 10 : 0;
+  const totalHeight = qrWidth + topLabelSpace + bottomLabelSpace + padding * 2;
+  const totalWidth = qrWidth + padding * 2;
+
+  return { totalWidth, totalHeight };
 };

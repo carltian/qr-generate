@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { View, Text, Image, Input, Slider } from "@tarojs/components";
+import { View, Text, Image, Input, Slider, Canvas } from "@tarojs/components";
 import Taro, { useRouter } from "@tarojs/taro";
 import { Button, ConfigProvider } from "@nutui/nutui-react-taro";
 import {
@@ -7,6 +7,7 @@ import {
   generateFullQRCodeImage,
   QRCodeOptions,
   calculateMaxLogoSize,
+  calculateFullQRCodeSize,
 } from "@/utils/qrcode";
 import "./index.scss";
 
@@ -79,6 +80,7 @@ const ConfigurePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [activePreset, setActivePreset] = useState(0);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pageRef = useRef(null);
 
   /**
    * 初始化：获取路由参数
@@ -106,7 +108,12 @@ const ConfigurePage: React.FC = () => {
         },
         errorCorrectionLevel: config.errorCorrectionLevel,
       };
-      const tempFilePath = await generateQRCodeTempFile(text, options);
+      const tempFilePath = await generateQRCodeTempFile(
+        "qrcode-preview",
+        text,
+        options,
+        pageRef.current
+      );
       setQrCodeUrl(tempFilePath);
     } catch (error) {
       console.error("生成二维码失败:", error);
@@ -220,19 +227,24 @@ const ConfigurePage: React.FC = () => {
 
     setIsSaving(true);
     try {
-      const fullImagePath = await generateFullQRCodeImage(text, {
-        width: config.width,
-        margin: config.margin,
-        color: {
-          dark: config.darkColor,
-          light: config.lightColor,
+      const fullImagePath = await generateFullQRCodeImage(
+        "qrcode-save",
+        text,
+        {
+          width: config.width,
+          margin: config.margin,
+          color: {
+            dark: config.darkColor,
+            light: config.lightColor,
+          },
+          errorCorrectionLevel: config.errorCorrectionLevel,
+          topLabel: config.topLabel,
+          bottomLabel: config.bottomLabel,
+          logoUrl: config.logoUrl,
+          logoSize: config.logoSize,
         },
-        errorCorrectionLevel: config.errorCorrectionLevel,
-        topLabel: config.topLabel,
-        bottomLabel: config.bottomLabel,
-        logoUrl: config.logoUrl,
-        logoSize: config.logoSize,
-      });
+        pageRef.current
+      );
 
       await Taro.saveImageToPhotosAlbum({
         filePath: fullImagePath,
@@ -242,6 +254,7 @@ const ConfigurePage: React.FC = () => {
         icon: "success",
       });
     } catch (saveError: any) {
+      console.error("保存失败:", saveError);
       if (saveError.errMsg && saveError.errMsg.includes("auth deny")) {
         Taro.showModal({
           title: "提示",
@@ -262,7 +275,7 @@ const ConfigurePage: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-  }, [qrCodeUrl]);
+  }, [qrCodeUrl, text, config]);
 
   /**
    * 计算Logo最大尺寸
@@ -273,13 +286,22 @@ const ConfigurePage: React.FC = () => {
   );
 
   /**
+   * 计算完整二维码图片的尺寸
+   */
+  const fullSize = calculateFullQRCodeSize(
+    config.width,
+    config.topLabel,
+    config.bottomLabel
+  );
+
+  /**
    * 将像素值转换为rpx（用于显示）
    */
   const pxToRpx = (px: number) => px * 2;
 
   return (
     <ConfigProvider>
-      <View className="configure-page">
+      <View className="configure-page" ref={pageRef}>
         <View className="preview-section">
           <View className="qr-container">
             {config.topLabel && (
@@ -617,6 +639,24 @@ const ConfigurePage: React.FC = () => {
             <Text>{isSaving ? "保存中..." : "保存到相册"}</Text>
           </Button>
         </View>
+
+        <Canvas
+          canvasId="qrcode-preview"
+          className="hidden-canvas"
+          style={{
+            width: `${config.width}px`,
+            height: `${config.width}px`,
+          }}
+        />
+
+        <Canvas
+          canvasId="qrcode-save"
+          className="hidden-canvas"
+          style={{
+            width: `${fullSize.totalWidth}px`,
+            height: `${fullSize.totalHeight}px`,
+          }}
+        />
       </View>
     </ConfigProvider>
   );

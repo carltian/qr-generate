@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from "react";
-import { View, Text, Image, Input } from "@tarojs/components";
+import React, { useState, useCallback, useRef } from "react";
+import { View, Text, Image, Input, Canvas } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { Button, ConfigProvider } from "@nutui/nutui-react-taro";
-import { generateQRCodeTempFile, defaultQRCodeOptions } from "@/utils/qrcode";
+import { generateQRCodeTempFile } from "@/utils/qrcode";
 import "./index.scss";
 
 /**
@@ -14,6 +14,7 @@ const GeneratePage: React.FC = () => {
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const maxLength = 500;
+  const pageRef = useRef(null);
 
   /**
    * 处理输入变化
@@ -40,11 +41,16 @@ const GeneratePage: React.FC = () => {
 
     setIsGenerating(true);
     try {
-      const tempFilePath = await generateQRCodeTempFile(inputText.trim(), {
-        width: 200,
-        margin: 2,
-        errorCorrectionLevel: "M",
-      });
+      const tempFilePath = await generateQRCodeTempFile(
+        "qrcode-generate",
+        inputText.trim(),
+        {
+          width: 200,
+          margin: 2,
+          errorCorrectionLevel: "H",
+        },
+        pageRef.current
+      );
       setQrCodeUrl(tempFilePath);
       Taro.showToast({
         title: "生成成功",
@@ -53,7 +59,7 @@ const GeneratePage: React.FC = () => {
     } catch (error) {
       console.error("生成二维码失败:", error);
       Taro.showToast({
-        title: "生成失败，请重试",
+        title: `生成失败，请重试`,
         icon: "none",
       });
     } finally {
@@ -88,7 +94,7 @@ const GeneratePage: React.FC = () => {
 
   return (
     <ConfigProvider>
-      <View className="generate-page">
+      <View className="generate-page" ref={pageRef}>
         <View className="page-header">
           <Text className="subtitle">输入内容，即刻生成二维码</Text>
         </View>
@@ -157,6 +163,15 @@ const GeneratePage: React.FC = () => {
             <Text className="btn-icon">→</Text>
           </Button>
         </View>
+
+        <Canvas
+          canvasId="qrcode-generate"
+          className="hidden-canvas"
+          style={{
+            width: "200px",
+            height: "200px",
+          }}
+        />
       </View>
     </ConfigProvider>
   );

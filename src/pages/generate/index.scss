@@ -227,6 +227,14 @@
       }
     }
   }
+
+  .hidden-canvas {
+    position: fixed;
+    left: -9999rpx;
+    top: -9999rpx;
+    opacity: 0;
+    pointer-events: none;
+  }
 }
 
 @keyframes fadeInDown {
