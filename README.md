@@ -176,3 +176,7 @@ calculateFullQRCodeSize(qrWidth, topLabel, bottomLabel);
 ## License
 
 MIT
+
+## 小程序地址
+
+- 微信小程序：[扫描二维码](https://github.com/carltian/qr-generate/raw/main/assets/weapp-qrcode.png)
