@@ -177,10 +177,19 @@ calculateFullQRCodeSize(qrWidth, topLabel, bottomLabel);
 
 MIT
 
-## 小程序地址
+## 小程序地址 & 公众号
 
-![微信小程序](assets/weapp-qrcode.png)
-
-## 我的公众号
-
-![公众号地址](assets/wechat-qrcode.jpg)
+<table>
+  <tr>
+    <td align="center">
+      <img src="assets/weapp-qrcode.png" width="150" />
+      <br/>
+      <b>微信小程序</b>
+    </td>
+    <td align="center">
+      <img src="assets/wechat-qrcode.jpg" width="150" />
+      <br/>
+      <b>公众号</b>
+    </td>
+  </tr>
+</table>
